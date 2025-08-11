@@ -81,4 +81,4 @@ This is a RAG (Retrieval-Augmented Generation) system with the following archite
 
 The system automatically loads documents from `/docs/` on startup and supports incremental document addition without reprocessing existing courses.
 - always use uv to run the server do not use pip directly
-- make sure to use uv to manage all dependencies
+- make sure to use uv to manage all dependencies3

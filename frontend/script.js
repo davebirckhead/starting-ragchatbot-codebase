@@ -5,7 +5,7 @@ const API_URL = '/api';
 let currentSessionId = null;
 
 // DOM elements
-let chatMessages, chatInput, sendButton, totalCourses, courseTitles, themeToggle;
+let chatMessages, chatInput, sendButton, totalCourses, courseTitles, themeToggle, newChatButton;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
@@ -16,6 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
     totalCourses = document.getElementById('totalCourses');
     courseTitles = document.getElementById('courseTitles');
     themeToggle = document.getElementById('themeToggle');
+    newChatButton = document.getElementById('newChatButton');
     
     setupEventListeners();
     initializeTheme();
@@ -38,6 +39,12 @@ function setupEventListeners() {
             e.preventDefault();
             toggleTheme();
         }
+    });
+    
+    // New chat button
+    newChatButton.addEventListener('click', () => {
+        createNewSession();
+        chatInput.focus();
     });
     
     // Suggested questions
@@ -78,12 +85,18 @@ async function sendMessage() {
             body: JSON.stringify({
                 query: query,
                 session_id: currentSessionId
-            })
+            }),
+            timeout: 30000  // 30 second timeout
         });
 
-        if (!response.ok) throw new Error('Query failed');
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            console.error('API Error:', response.status, errorData);
+            throw new Error(`Query failed (${response.status}): ${errorData.detail || 'Unknown server error'}`);
+        }
 
         const data = await response.json();
+        console.log('Query successful:', { query: query.substring(0, 50), sources: data.sources.length });
         
         // Update session ID if new
         if (!currentSessionId) {
@@ -95,9 +108,21 @@ async function sendMessage() {
         addMessage(data.answer, 'assistant', data.sources);
 
     } catch (error) {
+        console.error('Query error:', error);
         // Replace loading message with error
         loadingMessage.remove();
-        addMessage(`Error: ${error.message}`, 'assistant');
+        
+        // Provide more helpful error messages
+        let errorMessage = 'Unable to process your query. ';
+        if (error.name === 'TypeError' && error.message.includes('fetch')) {
+            errorMessage += 'Please check your internet connection and try again.';
+        } else if (error.message.includes('timeout')) {
+            errorMessage += 'The request timed out. Please try again.';
+        } else {
+            errorMessage += `Details: ${error.message}`;
+        }
+        
+        addMessage(errorMessage, 'assistant');
     } finally {
         chatInput.disabled = false;
         sendButton.disabled = false;
@@ -132,10 +157,25 @@ function addMessage(content, type, sources = null, isWelcome = false) {
     let html = `<div class="message-content">${displayContent}</div>`;
     
     if (sources && sources.length > 0) {
+        // Format sources as clickable links or plain text
+        const formattedSources = sources.map(source => {
+            if (typeof source === 'object' && source.text) {
+                // New structured format with text and optional URL
+                if (source.url) {
+                    return `<a href="${escapeHtml(source.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(source.text)}</a>`;
+                } else {
+                    return escapeHtml(source.text);
+                }
+            } else {
+                // Legacy string format - keep as plain text
+                return escapeHtml(source.toString());
+            }
+        });
+        
         html += `
             <details class="sources-collapsible">
                 <summary class="sources-header">Sources</summary>
-                <div class="sources-content">${sources.join(', ')}</div>
+                <div class="sources-content">${formattedSources.join(', ')}</div>
             </details>
         `;
     }
@@ -157,8 +197,31 @@ function escapeHtml(text) {
 // Removed removeMessage function - no longer needed since we handle loading differently
 
 async function createNewSession() {
+    // Clear current session on backend if exists
+    if (currentSessionId) {
+        try {
+            await fetch(`${API_URL}/clear_session`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    session_id: currentSessionId
+                })
+            });
+        } catch (error) {
+            console.error('Error clearing session:', error);
+        }
+    }
+    
+    // Reset frontend state
     currentSessionId = null;
     chatMessages.innerHTML = '';
+    
+    // Clear input field
+    chatInput.value = '';
+    
+    // Show welcome message
     addMessage('Welcome to the Course Materials Assistant! I can help you with questions about courses, lessons and specific content. What would you like to know?', 'assistant', null, true);
 }
 
@@ -236,5 +299,7 @@ function toggleTheme() {
 
 function updateThemeButtonLabel(theme) {
     const label = theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme';
-    themeToggle.setAttribute('aria-label', label);
+    if (themeToggle) {
+        themeToggle.setAttribute('aria-label', label);
+    }
 }
