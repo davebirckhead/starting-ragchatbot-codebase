@@ -8,6 +8,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Quick start**: `./run.sh` - Starts the entire application (ensure executable with `chmod +x run.sh`)
 - **Manual start**: `cd backend && uv run uvicorn app:app --reload --port 8000`
 - **Install dependencies**: `uv sync` (uses uv package manager)
+- **Install dev dependencies**: `uv sync --extra dev` (includes Black, isort, flake8, mypy)
+
+### Code Quality Tools
+- **Format code**: `./scripts/format.sh` - Runs Black and isort
+- **Lint code**: `./scripts/lint.sh` - Runs flake8 and mypy
+- **All quality checks**: `./scripts/quality.sh` - Runs formatting and linting
+- **Manual commands**:
+  - `uv run black backend/ main.py` - Format with Black
+  - `uv run isort backend/ main.py` - Sort imports
+  - `uv run flake8 backend/ main.py` - Lint with flake8
+  - `uv run mypy backend/ main.py` - Type check with mypy
 
 ### Environment Setup
 - Create `.env` file in root with: `ANTHROPIC_API_KEY=your_key_here`
